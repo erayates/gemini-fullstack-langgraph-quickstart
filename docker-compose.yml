@@ -1,11 +1,8 @@
-version: "3.9"
-
 volumes:
   langgraph-data:
     driver: local
-
 services:
-  redis:
+  langgraph-redis:
     image: docker.io/redis:6
     container_name: langgraph-redis
     healthcheck:
@@ -13,8 +10,7 @@ services:
       interval: 5s
       timeout: 1s
       retries: 5
-
-  postgres:
+  langgraph-postgres:
     image: docker.io/postgres:16
     container_name: langgraph-postgres
     ports:
@@ -31,49 +27,18 @@ services:
       timeout: 1s
       retries: 5
       interval: 5s
-
-  api:
-    # The 'image:' line was removed from here.
-    build:
-      context: .
-      dockerfile: ./backend/Dockerfile
+  langgraph-api:
+    image: gemini-fullstack-langgraph
     container_name: langgraph-api
     ports:
       - "8123:8000"
     depends_on:
-      redis:
+      langgraph-redis:
         condition: service_healthy
-      postgres:
+      langgraph-postgres:
         condition: service_healthy
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
-      REDIS_URI: redis://redis:6379
-      POSTGRES_URI: postgresql://postgres:postgres@postgres:5432/postgres?sslmode=disable
-    command: uvicorn app.server:app --host 0.0.0.0 --port 8000
-
-  frontend:
-    # The 'image:' line was removed from here.
-    build:
-      context: .
-      dockerfile: ./frontend/Dockerfile
-    container_name: langgraph-frontend
-    ports:
-      - "8124:3000"
-    depends_on:
-      - api
-    environment:
-      NEXT_PUBLIC_API_URL: http://api:8000
-
-  migration:
-    # The 'image:' line was removed from here.
-    build:
-      context: .
-      dockerfile: ./backend/Dockerfile
-    container_name: langgraph-migration
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      POSTGRES_URI: postgresql://postgres:postgres@postgres:5432/postgres?sslmode=disable
-    command: alembic upgrade head
+      REDIS_URI: redis://langgraph-redis:6379
+      POSTGRES_URI: postgres://postgres:postgres@langgraph-postgres:5432/postgres?sslmode=disable
